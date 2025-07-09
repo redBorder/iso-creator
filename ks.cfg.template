@@ -1,0 +1,105 @@
+lang en_US
+keyboard --xlayouts='us'
+timezone Asia/Tokyo --utc
+reboot
+cdrom
+
+bootloader --append="rhgb quiet crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M"
+zerombr
+clearpart --all --initlabel
+autopart
+network --bootproto=dhcp
+firstboot --disable
+selinux --enforcing
+firewall --enabled
+
+%packages
+@core
+%end
+
+%post --nochroot --log=/mnt/sysimage/root/ks-post.log
+
+mkdir -p /mnt/installcdrom
+mount -o ro /dev/cdrom /mnt/installcdrom
+
+mkdir -p /mnt/sysimage/RBREPO
+cp -a /mnt/installcdrom/RBREPO /mnt/sysimage/
+
+umount /mnt/installcdrom
+rmdir /mnt/installcdrom
+
+cat << 'EOF' > /mnt/sysimage/etc/systemd/system/localrepo-install.service
+[Unit]
+Description=Install redborder-[[PRODUCT_TYPE]] package on first boot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+ExecStartPre=/usr/bin/rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+ExecStartPre=/usr/bin/systemctl daemon-reload
+
+ExecStart=/usr/local/bin/install-redborder.sh
+
+ExecStartPost=/usr/bin/systemctl daemon-reload
+
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+cat << 'EOF' > /mnt/sysimage/usr/local/bin/install-redborder.sh
+#!/bin/bash
+set -e
+LOGFILE="/var/log/redborder-install.log"
+exec > >(tee -a "$LOGFILE") 2>&1
+
+echo "Starting redborder-[[PRODUCT_TYPE]] [[VERSION]] install"
+
+dnf clean all
+dnf makecache
+
+echo "Installing redborder-[[PRODUCT_TYPE]] [[VERSION]] from localrepo..."
+dnf install -y /RBREPO/*.rpm
+
+echo "Installation completed"
+
+systemctl disable localrepo-install.service
+rm -f /usr/local/bin/install-redborder.sh
+
+cat << 'REPO' > /etc/yum.repos.d/redborder.repo
+[redborder]
+name=redborder local repository
+baseurl=file:///RBREPO
+enabled=1
+gpgcheck=0
+REPO
+
+echo "Rebooting system after install..."
+systemctl reboot
+
+EOF
+
+chmod +x /mnt/sysimage/usr/local/bin/install-redborder.sh
+
+chroot /mnt/sysimage systemctl enable localrepo-install.service
+
+echo "Welcome to redBorder [[PRODUCT_TYPE]] ([[VERSION]])" > /mnt/sysimage/etc/issue
+
+if grep -q '^PRETTY_NAME=' /mnt/sysimage/etc/os-release; then
+    sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="redBorder [[PRODUCT_TYPE]] ([[VERSION]])"/' /mnt/sysimage/etc/os-release
+else
+    echo 'PRETTY_NAME="redBorder [[PRODUCT_TYPE]] ([[VERSION]])"' >> /mnt/sysimage/etc/os-release
+fi
+
+%end
+
+%post --log=/root/ks-final.log
+echo "redBorder [[PRODUCT_TYPE]] ([[VERSION]]) is not currently configured, please run rb_setup_wizard" > /etc/motd
+echo "redborder-[[PRODUCT_TYPE]] ([[VERSION]]) post-install complete." >> /var/log/ks-post.log
+%end
