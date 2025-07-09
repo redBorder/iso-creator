@@ -97,8 +97,6 @@ mkdir -p "$MNT_DIR" "$ISO_DIR" "$INSTALL_IMG_DIR" "$ROOTFS_DIR" "$LOCAL_RPMS_DIR
 echo "Downloading redborder-repo RPM..."
 curl -sSL "$REPO_RPM_URL" -o /tmp/redborder-repo.rpm > /dev/null
 
-echo "Downloading redborder-repo RPM..."
-curl -sSL "$REPO_RPM_URL" -o /tmp/redborder-repo.rpm
 
 echo "Installing redborder-repo..."
 sudo dnf install -y /tmp/redborder-repo.rpm
@@ -110,6 +108,9 @@ dnf repoquery \
   --repo=redborder-$REDBORDER_VERSION \
   --location --latest-limit=1 \
 | xargs -r -n1 curl -LO --output-dir "$LOCAL_RPMS_DIR"
+
+echo "Downloading redborder-$PRODUCT_TYPE packages deps..."
+dnf download --resolve --alldeps redborder-$PRODUCT_TYPE --destdir "$LOCAL_RPMS_DIR" > /dev/null
 
 echo "Disabling redborder repository..."
 sudo dnf config-manager --set-disabled redborder-$REDBORDER_VERSION

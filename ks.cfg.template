@@ -64,14 +64,6 @@ echo "Starting redborder-[[PRODUCT_TYPE]] [[VERSION]] install"
 dnf clean all
 dnf makecache
 
-echo "Installing redborder-[[PRODUCT_TYPE]] [[VERSION]] from localrepo..."
-dnf install -y /RBREPO/*.rpm
-
-echo "Installation completed"
-
-systemctl disable localrepo-install.service
-rm -f /usr/local/bin/install-redborder.sh
-
 cat << 'REPO' > /etc/yum.repos.d/redborder.repo
 [redborder]
 name=redborder local repository
@@ -79,6 +71,14 @@ baseurl=file:///RBREPO
 enabled=1
 gpgcheck=0
 REPO
+
+echo "Installing redborder-[[PRODUCT_TYPE]] [[VERSION]] from localrepo..."
+dnf install -y /RBREPO/redborder-[[PRODUCT_TYPE]]*.rpm
+
+echo "Installation completed"
+
+systemctl disable localrepo-install.service
+rm -f /usr/local/bin/install-redborder.sh
 
 echo "Rebooting system after install..."
 systemctl reboot
